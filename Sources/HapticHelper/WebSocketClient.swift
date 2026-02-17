@@ -12,6 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Substantial portions of this file are adapted from example code from the
+// SwiftNIO project, see above. Additions for the purposes of the HapticHelper
+// project are copyright (c) 2026 Lexie T,
+// and licensed under the Apache License v2.0.
+
 import NIOCore
 import NIOHTTP1
 import NIOPosix
@@ -103,26 +108,28 @@ struct Client {
         for try await frame in inbound {
           switch frame.opcode {
           case .pong:
-            print("Received pong: \(String(buffer: frame.data))")
+            break
+            // print("Received pong: \(String(buffer: frame.data))")
 
           case .text:
-            print("Received: \(String(buffer: frame.data))")
+            try await translator.process(line: String(buffer: frame.data));
 
           case .connectionClose:
-            // Handle a received close frame. We're just going to close by returning from this method.
-            print("Received Close instruction from server")
-            return
+            exit(0)
+
           case .binary, .continuation:
             break
+
           case .ping:
-            print("Received ping")
+            // print("Received ping")
 
             try await outbound.write(WebSocketFrame(fin: true, opcode: .pong, maskKey: .random(), data: frame.data))
 
             break
+
           default:
             // Unknown frames are errors.
-            return
+            exit(1)
           }
         }
 
@@ -131,7 +138,8 @@ struct Client {
       let outboundFuture = eventLoopGroup.any().makeFutureWithTask {
 
         for await line in translator.eventChannel {
-          let pingFrame = WebSocketFrame(fin: true, opcode: .ping, maskKey: .random(), data: ByteBuffer(string: line))
+          let pingFrame = WebSocketFrame(fin: true, opcode: .text, maskKey: .random(), data: ByteBuffer(string: line))
+
           try await outbound.write(pingFrame)
         }
 

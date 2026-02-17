@@ -1,5 +1,5 @@
-// The Swift Programming Language
-// https://docs.swift.org/swift-book
+// Copyright (c) 2026 Lexie T
+// Licensed under the terms of GPL v3.0 or later, see LICENSE
 
 import Foundation
 

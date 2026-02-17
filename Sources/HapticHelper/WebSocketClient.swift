@@ -92,12 +92,12 @@ struct Client {
   private func handleUpgradeResult(_ upgradeResult: EventLoopFuture<UpgradeResult>) async throws {
     switch try await upgradeResult.get() {
     case .websocket(let websocketChannel):
-      print("Handling websocket connection")
+      // print("Handling websocket connection")
       try await self.handleWebsocketChannel(websocketChannel)
-      print("Done handling websocket connection")
+      // print("Done handling websocket connection")
     case .notUpgraded:
       // The upgrade to websocket did not succeed. We are just exiting in this case.
-      print("Upgrade declined")
+      print("!! Couldn't connect by websocket")
     }
   }
 

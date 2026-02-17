@@ -132,6 +132,29 @@ actor Translator {
     let DeviceIndex: Int
     let DeviceName: String
     let DeviceMessages: [String: MessageInfo]
+
+    func vibrateCommands(Id: Int, power: Double) -> [RequestWrapper] {
+      guard
+        let vibrationInfo = DeviceMessages["VibrateCmd"],
+        let featureCount = vibrationInfo.FeatureCount
+      else {
+        preconditionFailure()
+      }
+
+      let featureSpeeds: [FeatureSpeed] = (0 ..< featureCount)
+        .map {
+          FeatureSpeed(Index: $0, Speed: power)
+        }
+
+      return [
+        .VibrateCmd(Id: Id, DeviceIndex: DeviceIndex, Speeds: featureSpeeds),
+      ]
+    }
+  }
+
+  struct FeatureSpeed: Codable {
+    let Index: Int
+    let Speed: Double
   }
 
   enum RequestWrapper: Codable {
@@ -148,6 +171,8 @@ actor Translator {
 
     case StopAllDevices(Id: Int)
 
+    case VibrateCmd(Id: Int, DeviceIndex: Int, Speeds: [FeatureSpeed])
+
     var identifier: Int {
       switch self {
       case .RequestServerInfo(let Id, _, _): return Id
@@ -161,6 +186,7 @@ actor Translator {
       case .DeviceAdded(let Id, _): return Id
       case .DeviceRemoved(let Id, _): return Id
       case .StopAllDevices(let Id): return Id
+      case .VibrateCmd(let Id, _, _): return Id
       }
     }
   }
@@ -195,15 +221,63 @@ actor Translator {
     default:
       await run(command)
     }
+  }
 
-    print("\(command)")
+  fileprivate func doPulseCommand(device: Device, power: PowerLevel, offset: Double = 0.0) async throws {
+    let decaySteps: Int
+
+    switch power {
+    case .low:    decaySteps = 2
+    case .medium: decaySteps = 4
+    case .high:   decaySteps = 6
+    }
+
+    let pulseTime: UInt64 = 480_000_000
+    let stepTime: UInt64 = pulseTime / UInt64(decaySteps)
+
+    for i in 0..<decaySteps {
+      try await send(requests: device.vibrateCommands(Id: nextEventIndex, power: Double(decaySteps - i) * 0.10 + offset))
+      try await Task.sleep(nanoseconds: stepTime)
+    }
+    try await send(requests: device.vibrateCommands(Id: nextEventIndex, power: 0.00))
+  }
+
+  fileprivate func doHeartbeatCommand(device: Device, power: PowerLevel) async throws {
+    try await doPulseCommand(device: device, power: power, offset: 0.05)
+
+    try await Task.sleep(nanoseconds: 50_000_000)
+
+    try await doPulseCommand(device: device, power: power, offset: 0.0)
+  }
+
+  fileprivate func execute(_ command: CachedCommand, device: Device) async {
+    switch command {
+    case .connect:
+      break
+
+    case .vibrate(_, let power):
+      try! await send(requests: device.vibrateCommands(Id: nextEventIndex, power: power))
+
+    case .pulse(_, let power):
+      try! await doPulseCommand(device: device, power: power)
+
+    case .heartbeat(_, let power):
+      try! await doHeartbeatCommand(device: device, power: power)
+
+    default:
+      exit(1)
+    }
   }
 
   fileprivate func run(_ command: CachedCommand) async {
     if let device = devices[command.deviceIndex] {
-      // send message to device
+      await execute(command, device: device)
     } else {
-      // cache message until connection can be established
+      print("?? Device not connected, scanning")
+
+      cachedCommands[command.deviceIndex] = cachedCommands[command.deviceIndex] ?? [] + [command]
+
+      await scan()
     }
   }
 
@@ -217,10 +291,20 @@ actor Translator {
     )
   }
 
-  fileprivate func register(device: Device) {
+  fileprivate func register(device: Device) async {
     // print("registering ``\(device.DeviceName)'' as #\(device.DeviceIndex)")
 
     self.devices[device.DeviceIndex] = device
+
+    if let cachedCommands = self.cachedCommands[device.DeviceIndex] {
+      print("?? Connected to device \(device.DeviceIndex), issuing cached commands")
+
+      for command in cachedCommands {
+        await execute(command, device: device)
+      }
+
+      self.cachedCommands[device.DeviceIndex] = nil
+    }
   }
 
   func process(line: String) async throws {
@@ -238,7 +322,7 @@ actor Translator {
 
       case .DeviceList(_, let devices):
         for device in devices {
-          register(device: device)
+          await register(device: device)
         }
 
       case .ServerInfo:

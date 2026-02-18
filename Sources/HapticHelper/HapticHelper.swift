@@ -7,7 +7,8 @@ import Foundation
 struct HapticHelper {
 
   static func main() async throws {
-    let translator = Translator()
+    let resolver = DeviceResolver()
+    let translator = Translator(resolver: resolver)
 
     Task {
 

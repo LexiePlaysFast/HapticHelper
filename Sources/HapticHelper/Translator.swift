@@ -7,6 +7,12 @@ import AsyncAlgorithms
 
 actor Translator {
 
+  let resolver: DeviceResolver
+
+  init(resolver: DeviceResolver) {
+    self.resolver = resolver
+  }
+
   let encoder = JSONEncoder()
   let decoder = JSONDecoder()
 

@@ -28,17 +28,17 @@ actor Translator {
 
   enum CachedCommand {
     case stop
-    case connect(deviceIndex: Int)
-    case vibrate(deviceIndex: Int, power: Double)
-    case pulse(deviceIndex: Int, power: PowerLevel)
-    case heartbeat(deviceIndex: Int, power: PowerLevel)
+    case connect(deviceAddress: DeviceResolver.Resolution)
+    case vibrate(deviceAddress: DeviceResolver.Resolution, power: Double)
+    case pulse(deviceAddress: DeviceResolver.Resolution, power: PowerLevel)
+    case heartbeat(deviceAddress: DeviceResolver.Resolution, power: PowerLevel)
 
-    var deviceIndex: Int {
+    var deviceAddress: DeviceResolver.Resolution {
       switch self {
-      case .connect(let deviceIndex): return deviceIndex
-      case .vibrate(let deviceIndex, _): return deviceIndex
-      case .pulse(let deviceIndex, _): return deviceIndex
-      case .heartbeat(let deviceIndex, _): return deviceIndex
+      case .connect(let deviceAddress): return deviceAddress
+      case .vibrate(let deviceAddress, _): return deviceAddress
+      case .pulse(let deviceAddress, _): return deviceAddress
+      case .heartbeat(let deviceAddress, _): return deviceAddress
       default: preconditionFailure()
       }
     }
@@ -79,21 +79,19 @@ actor Translator {
     case .connect:
       guard
         elements.count == 2,
-        let resolution = resolver.resolve(device: elements[1]),
-        case .index(let deviceIndex) = resolution
+        let resolution = resolver.resolve(device: elements[1])
       else {
         print("!! Invalid arguments, expected device index")
 
         return nil
       }
 
-      return .connect(deviceIndex: deviceIndex)
+      return .connect(deviceAddress: resolution)
 
     case .vibrate:
       guard
         elements.count == 3,
         let resolution = resolver.resolve(device: elements[1]),
-        case .index(let deviceIndex) = resolution,
         let power = Double(elements[2])
       else {
         print("!! Invalid arguments, expected device index, power level")
@@ -101,13 +99,12 @@ actor Translator {
         return nil
       }
 
-      return .vibrate(deviceIndex: deviceIndex, power: power)
+      return .vibrate(deviceAddress: resolution, power: power)
 
     case .pulse:
       guard
         elements.count == 3,
         let resolution = resolver.resolve(device: elements[1]),
-        case .index(let deviceIndex) = resolution,
         let power = PowerLevel(rawValue: String(elements[2]))
       else {
         print("!! Invalid arguments, expected device index, power level")
@@ -115,13 +112,12 @@ actor Translator {
         return nil
       }
 
-      return .pulse(deviceIndex: deviceIndex, power: power)
+      return .pulse(deviceAddress: resolution, power: power)
 
     case .heartbeat:
       guard
         elements.count == 3,
         let resolution = resolver.resolve(device: elements[1]),
-        case .index(let deviceIndex) = resolution,
         let power = PowerLevel(rawValue: String(elements[2]))
       else {
         print("!! Invalid arguments, expected device index, power level")
@@ -129,7 +125,7 @@ actor Translator {
         return nil
       }
 
-      return .heartbeat(deviceIndex: deviceIndex, power: power)
+      return .heartbeat(deviceAddress: resolution, power: power)
     }
   }
 
@@ -215,7 +211,7 @@ actor Translator {
 
   fileprivate var eventCache: [Int: RequestWrapper] = [:]
   fileprivate var devices: [Int: Device] = [:]
-  fileprivate var cachedCommands: [Int: [CachedCommand]] = [:]
+  fileprivate var cachedCommands: [CachedCommand] = []
 
   func clInput(line: String) async throws {
     guard
@@ -279,42 +275,73 @@ actor Translator {
   }
 
   fileprivate func run(_ command: CachedCommand) async throws {
-    if let device = devices[command.deviceIndex] {
+    func resolve(deviceAddress: DeviceResolver.Resolution) -> Int? {
+      switch deviceAddress {
+      case .first:
+        devices.first?.value.DeviceIndex
+      case .index(let deviceIndex):
+        deviceIndex
+      }
+    }
+
+    if
+      let deviceIndex = resolve(deviceAddress: command.deviceAddress),
+      let device = devices[deviceIndex]
+    {
       try await execute(command, device: device)
     } else {
       print("?? Device not connected, scanning")
 
-      cachedCommands[command.deviceIndex] = cachedCommands[command.deviceIndex] ?? [] + [command]
+      cachedCommands.append(command)
 
       try await scan()
     }
   }
 
-  fileprivate func stopAllDevices() async throws {
-    print("!! Stopping all devices.")
-
+  func gracefulStop() async throws {
     try await send(
       .StopAllDevices(
         Id: nextEventIndex
       ),
     )
 
-    cachedCommands = [:]
+    cachedCommands = []
+  }
+
+  fileprivate func stopAllDevices() async throws {
+    print("!! Stopping all devices.")
+
+    try await gracefulStop()
   }
 
   fileprivate func register(device: Device) async throws {
+    func resolvesTo(deviceAddress: DeviceResolver.Resolution, deviceIndex: Int) -> Bool {
+      switch deviceAddress {
+      case .first:
+        true
+
+      case .index(let index):
+        index == deviceIndex
+      }
+    }
+
     // print("registering ``\(device.DeviceName)'' as #\(device.DeviceIndex)")
 
     self.devices[device.DeviceIndex] = device
 
-    if let cachedCommands = self.cachedCommands[device.DeviceIndex] {
-      print("?? Connected to device \(device.DeviceIndex), issuing cached commands")
+    let pivot = cachedCommands.partition {
+      resolvesTo(deviceAddress: $0.deviceAddress, deviceIndex: device.DeviceIndex)
+    }
 
-      for command in cachedCommands {
+    let toDo = cachedCommands[pivot...]
+    cachedCommands = Array(cachedCommands[..<pivot])
+
+    if toDo.count > 0 {
+      print("?? Connected to device `\(device.DeviceName)', issuing cached commands")
+
+      for command in toDo {
         try await execute(command, device: device)
       }
-
-      self.cachedCommands[device.DeviceIndex] = nil
     }
   }
 

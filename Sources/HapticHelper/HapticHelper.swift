@@ -16,6 +16,8 @@ struct HapticHelper {
         try! await translator.clInput(line: line)
       }
 
+      try! await translator.gracefulStop()
+
       exit(0)
     }
 

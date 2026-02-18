@@ -298,6 +298,8 @@ actor Translator {
         Id: nextEventIndex
       ),
     )
+
+    cachedCommands = [:]
   }
 
   fileprivate func register(device: Device) async throws {
@@ -322,7 +324,7 @@ actor Translator {
     for response in input {
       switch response {
       case .DeviceRemoved(_, let deviceIndex):
-        print("!! Device \(deviceIndex) disconnected.")
+        print("!! Device `\(devices[deviceIndex]?.DeviceName ?? "Unknown Device")' disconnected.")
 
         devices[deviceIndex] = nil
 
@@ -407,13 +409,15 @@ actor Translator {
       ),
     )
 
-    try await Task.sleep(for: .seconds(seconds))
+    Task {
+      try await Task.sleep(for: .seconds(seconds))
 
-    try await send(
-      .StopScanning(
-        Id: nextEventIndex
-      ),
-    )
+      try await send(
+        .StopScanning(
+          Id: nextEventIndex
+        ),
+      )
+    }
   }
 
   func doHandshake() async throws {

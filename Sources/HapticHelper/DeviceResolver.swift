@@ -65,8 +65,8 @@ class DeviceResolver {
 
   let rules: [DeviceRule]
 
-  init() {
-    rules = []
+  init(rules: [DeviceRule] = []) {
+    self.rules = rules
   }
 
   enum RuleName: Equatable {
@@ -87,7 +87,7 @@ class DeviceResolver {
     }
   }
 
-  enum Resolution {
+  enum Resolution: Hashable, Equatable {
     case first
     case index(Int)
 

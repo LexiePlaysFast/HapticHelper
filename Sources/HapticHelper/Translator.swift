@@ -79,7 +79,8 @@ actor Translator {
     case .connect:
       guard
         elements.count == 2,
-        let deviceIndex = Int(elements[1])
+        let resolution = resolver.resolve(device: elements[1]),
+        case .index(let deviceIndex) = resolution
       else {
         print("!! Invalid arguments, expected device index")
 
@@ -91,7 +92,8 @@ actor Translator {
     case .vibrate:
       guard
         elements.count == 3,
-        let deviceIndex = Int(elements[1]),
+        let resolution = resolver.resolve(device: elements[1]),
+        case .index(let deviceIndex) = resolution,
         let power = Double(elements[2])
       else {
         print("!! Invalid arguments, expected device index, power level")
@@ -104,7 +106,8 @@ actor Translator {
     case .pulse:
       guard
         elements.count == 3,
-        let deviceIndex = Int(elements[1]),
+        let resolution = resolver.resolve(device: elements[1]),
+        case .index(let deviceIndex) = resolution,
         let power = PowerLevel(rawValue: String(elements[2]))
       else {
         print("!! Invalid arguments, expected device index, power level")
@@ -117,7 +120,8 @@ actor Translator {
     case .heartbeat:
       guard
         elements.count == 3,
-        let deviceIndex = Int(elements[1]),
+        let resolution = resolver.resolve(device: elements[1]),
+        case .index(let deviceIndex) = resolution,
         let power = PowerLevel(rawValue: String(elements[2]))
       else {
         print("!! Invalid arguments, expected device index, power level")

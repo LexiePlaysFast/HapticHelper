@@ -145,7 +145,7 @@ struct Client {
 
       }
 
-      await translator.doHandshake()
+      try await translator.doHandshake()
 
       _ = try await inboundFuture.and(outboundFuture).get()
     }

@@ -12,7 +12,7 @@ struct HapticHelper {
     Task {
 
       while let line = readLine() {
-        await translator.clInput(line: line)
+        try! await translator.clInput(line: line)
       }
 
       exit(0)

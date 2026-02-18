@@ -207,7 +207,7 @@ actor Translator {
   fileprivate var devices: [Int: Device] = [:]
   fileprivate var cachedCommands: [Int: [CachedCommand]] = [:]
 
-  func clInput(line: String) async {
+  func clInput(line: String) async throws {
     guard
       let command = parse(command: line)
     else {
@@ -216,10 +216,10 @@ actor Translator {
 
     switch command {
     case .stop:
-      await stopAllDevices()
+      try await stopAllDevices()
 
     default:
-      await run(command)
+      try await run(command)
     }
   }
 
@@ -249,48 +249,48 @@ actor Translator {
     try await doPulseCommand(device: device, power: power, offset: 0.0)
   }
 
-  fileprivate func execute(_ command: CachedCommand, device: Device) async {
+  fileprivate func execute(_ command: CachedCommand, device: Device) async throws {
     switch command {
     case .connect:
       break
 
     case .vibrate(_, let power):
-      try! await send(requests: device.vibrateCommands(Id: nextEventIndex, power: power))
+      try await send(requests: device.vibrateCommands(Id: nextEventIndex, power: power))
 
     case .pulse(_, let power):
-      try! await doPulseCommand(device: device, power: power)
+      try await doPulseCommand(device: device, power: power)
 
     case .heartbeat(_, let power):
-      try! await doHeartbeatCommand(device: device, power: power)
+      try await doHeartbeatCommand(device: device, power: power)
 
     default:
       exit(1)
     }
   }
 
-  fileprivate func run(_ command: CachedCommand) async {
+  fileprivate func run(_ command: CachedCommand) async throws {
     if let device = devices[command.deviceIndex] {
-      await execute(command, device: device)
+      try await execute(command, device: device)
     } else {
       print("?? Device not connected, scanning")
 
       cachedCommands[command.deviceIndex] = cachedCommands[command.deviceIndex] ?? [] + [command]
 
-      await scan()
+      try await scan()
     }
   }
 
-  fileprivate func stopAllDevices() async {
+  fileprivate func stopAllDevices() async throws {
     print("!! Stopping all devices.")
 
-    await send(
+    try await send(
       .StopAllDevices(
         Id: nextEventIndex
       ),
     )
   }
 
-  fileprivate func register(device: Device) async {
+  fileprivate func register(device: Device) async throws {
     // print("registering ``\(device.DeviceName)'' as #\(device.DeviceIndex)")
 
     self.devices[device.DeviceIndex] = device
@@ -299,7 +299,7 @@ actor Translator {
       print("?? Connected to device \(device.DeviceIndex), issuing cached commands")
 
       for command in cachedCommands {
-        await execute(command, device: device)
+        try await execute(command, device: device)
       }
 
       self.cachedCommands[device.DeviceIndex] = nil
@@ -307,7 +307,7 @@ actor Translator {
   }
 
   func process(line: String) async throws {
-    let input = try! decoder.decode([RequestWrapper].self, from: line.data(using: .utf8)!)
+    let input = try decoder.decode([RequestWrapper].self, from: line.data(using: .utf8)!)
 
     for response in input {
       switch response {
@@ -317,17 +317,17 @@ actor Translator {
         devices[deviceIndex] = nil
 
       case .DeviceAdded:
-        await requestDeviceList()
+        try await requestDeviceList()
 
       case .DeviceList(_, let devices):
         for device in devices {
-          await register(device: device)
+          try await register(device: device)
         }
 
       case .ServerInfo:
-        await completeHandshake(response)
+        try await completeHandshake(response)
       case .Ok:
-        await discharge(response)
+        try await discharge(response)
 
       default:
         print("undefined action: \(response)")
@@ -337,16 +337,16 @@ actor Translator {
     }
   }
 
-  fileprivate func checkCommandCache() async {
+  fileprivate func checkCommandCache() async throws {
     if cachedCommands.count > 0 {
       print("!! Unable to discover all devices. Starting new scan.")
 
-      await scan()
+      try await scan()
     }
   }
 
-  fileprivate func send(_ requests: RequestWrapper...) async {
-    try! await send(requests: requests)
+  fileprivate func send(_ requests: RequestWrapper...) async throws {
+    try await send(requests: requests)
   }
 
   fileprivate func send(requests: [RequestWrapper]) async throws {
@@ -360,11 +360,11 @@ actor Translator {
     await eventChannel.send(requestString)
   }
 
-  fileprivate func completeHandshake(_ response: RequestWrapper) async {
-    await discharge(response)
+  fileprivate func completeHandshake(_ response: RequestWrapper) async throws {
+    try await discharge(response)
   }
 
-  fileprivate func discharge(_ response: RequestWrapper) async {
+  fileprivate func discharge(_ response: RequestWrapper) async throws {
     let originalRequest = eventCache[response.identifier]!
 
     switch originalRequest {
@@ -373,7 +373,7 @@ actor Translator {
 
     case .StopScanning:
       isScanning = false
-      await checkCommandCache()
+      try await checkCommandCache()
 
     default:
       // Most messages don't require any kind of response
@@ -384,30 +384,30 @@ actor Translator {
     eventCache[response.identifier] = nil
   }
 
-  fileprivate func scan(for seconds: TimeInterval = 30.0) async {
+  fileprivate func scan(for seconds: TimeInterval = 30.0) async throws {
     guard
       !isScanning
     else {
       return
     }
 
-    await send(
+    try await send(
       .StartScanning(
         Id: nextEventIndex
       ),
     )
 
-    try? await Task.sleep(for: .seconds(seconds))
+    try await Task.sleep(for: .seconds(seconds))
 
-    await send(
+    try await send(
       .StopScanning(
         Id: nextEventIndex
       ),
     )
   }
 
-  func doHandshake() async {
-    await send(
+  func doHandshake() async throws {
+    try await send(
       .RequestServerInfo(
         Id: nextEventIndex,
         MessageVersion: 2,
@@ -415,13 +415,13 @@ actor Translator {
       ),
     )
 
-    await requestDeviceList()
+    try await requestDeviceList()
 
-    await scan()
+    try await scan()
   }
 
-  fileprivate func requestDeviceList() async {
-    await send(
+  fileprivate func requestDeviceList() async throws {
+    try await send(
       .RequestDeviceList(
         Id: nextEventIndex
       ),

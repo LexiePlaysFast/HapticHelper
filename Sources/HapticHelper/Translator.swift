@@ -232,12 +232,11 @@ actor Translator {
     case .high:   decaySteps = 6
     }
 
-    let pulseTime: UInt64 = 480_000_000
-    let stepTime: UInt64 = pulseTime / UInt64(decaySteps)
+    let pulseTime = 480
 
     for i in 0..<decaySteps {
       try await send(requests: device.vibrateCommands(Id: nextEventIndex, power: Double(decaySteps - i) * 0.10 + offset))
-      try await Task.sleep(nanoseconds: stepTime)
+      try await Task.sleep(for: .milliseconds(pulseTime) / decaySteps)
     }
     try await send(requests: device.vibrateCommands(Id: nextEventIndex, power: 0.00))
   }
@@ -245,7 +244,7 @@ actor Translator {
   fileprivate func doHeartbeatCommand(device: Device, power: PowerLevel) async throws {
     try await doPulseCommand(device: device, power: power, offset: 0.05)
 
-    try await Task.sleep(nanoseconds: 50_000_000)
+    try await Task.sleep(for: .milliseconds(50))
 
     try await doPulseCommand(device: device, power: power, offset: 0.0)
   }
@@ -398,7 +397,7 @@ actor Translator {
       ),
     )
 
-    try? await Task.sleep(nanoseconds: UInt64(Double(1_000_000_000) * seconds))
+    try? await Task.sleep(for: .seconds(seconds))
 
     await send(
       .StopScanning(

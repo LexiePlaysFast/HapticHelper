@@ -103,35 +103,10 @@ class DeviceResolver {
   }
 
   func resolve(device: any StringProtocol) -> Resolution? {
-    let matches = rules
-      .compactMap { rule in
-        rule.match(device)
-      }
-
-    if matches.count == 0 {
-      if let directResolution = Resolution(string: String(device)) {
-        return directResolution
-      } else {
-        return nil
-      }
-    } else if matches.count == 1 {
-      return matches.first
-    } else {
-      let narrowedMatches = rules
-        .filter { rule in
-          rule.from != .any
-        }
-        .compactMap { rule in
-          rule.match(device)
-        }
-
-      if (narrowedMatches.count == 1) {
-        return narrowedMatches.first
-      } else {
-        print("?? Ambiguous device name \(device) matches multiple rules, sending first match")
-
-        return narrowedMatches.first ?? matches.first
-      }
-    }
+    rules
+      .compactMap { $0.match(device) }
+      .first
+      ??
+      Resolution(string: String(device))
   }
 }

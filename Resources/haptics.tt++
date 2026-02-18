@@ -1,0 +1,16 @@
+/*
+ *  haptics.tt++
+ *  copyright (c) 2026 Lexie T --- Public Domain, or CC0 where required by law
+ *
+ *  run with #run {haptics} {path/to/HapticHelper} {path/to/haptics.tt++} ; #neonmoo
+ *
+ *  change the name of the main session from `neonmoo' as required, used here as an
+ *  example and reference implementation
+ */
+
+
+#neonmoo {#gag {^#$#HAPTIC }}
+#neonmoo {#action {^#$#HAPTIC %1$} {#haptics %1}}
+
+#action {^!! %1$} {#neonmoo {#echo {<119>Haptics: %1}}}
+#action {^\?\? %1$} {#neonmoo {#echo {<139>Haptics: %1}}}

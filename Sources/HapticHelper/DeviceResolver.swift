@@ -38,7 +38,7 @@ class DeviceResolver {
     }
 
     init?(_ string: any StringProtocol) {
-      let elements = string.split(separator: " ")
+      let elements = string.split(separator: " ", maxSplits: 2)
 
       guard
         elements.count == 2
@@ -89,6 +89,7 @@ class DeviceResolver {
 
   enum Resolution: Hashable, Equatable {
     case first
+    case name(String)
     case index(Int)
 
     init?(string: String) {
@@ -97,7 +98,7 @@ class DeviceResolver {
       } else if let index = Int(string) {
         self = .index(index)
       } else {
-        return nil
+        self = .name(string)
       }
     }
   }

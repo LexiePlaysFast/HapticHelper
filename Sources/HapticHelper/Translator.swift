@@ -274,20 +274,31 @@ actor Translator {
     }
   }
 
+  fileprivate func resolvesTo(deviceAddress: DeviceResolver.Resolution, deviceIndex: Int, deviceName: String) -> Bool {
+    switch deviceAddress {
+    case .first:
+      true
+
+    case .name(let string):
+      string == deviceName
+
+    case .index(let index):
+      index == deviceIndex
+    }
+  }
+
   fileprivate func run(_ command: CachedCommand) async throws {
-    func resolve(deviceAddress: DeviceResolver.Resolution) -> Int? {
-      switch deviceAddress {
-      case .first:
-        devices.first?.value.DeviceIndex
-      case .index(let deviceIndex):
-        deviceIndex
+    func resolve(deviceAddress: DeviceResolver.Resolution) -> Device? {
+      for (_, device) in devices {
+        if resolvesTo(deviceAddress: deviceAddress, deviceIndex: device.DeviceIndex, deviceName: device.DeviceName) {
+          return device
+        }
       }
+
+      return nil
     }
 
-    if
-      let deviceIndex = resolve(deviceAddress: command.deviceAddress),
-      let device = devices[deviceIndex]
-    {
+    if let device = resolve(deviceAddress: command.deviceAddress) {
       try await execute(command, device: device)
     } else {
       print("?? Device not connected, scanning")
@@ -315,22 +326,12 @@ actor Translator {
   }
 
   fileprivate func register(device: Device) async throws {
-    func resolvesTo(deviceAddress: DeviceResolver.Resolution, deviceIndex: Int) -> Bool {
-      switch deviceAddress {
-      case .first:
-        true
-
-      case .index(let index):
-        index == deviceIndex
-      }
-    }
-
     // print("registering ``\(device.DeviceName)'' as #\(device.DeviceIndex)")
 
     self.devices[device.DeviceIndex] = device
 
     let pivot = cachedCommands.partition {
-      resolvesTo(deviceAddress: $0.deviceAddress, deviceIndex: device.DeviceIndex)
+      resolvesTo(deviceAddress: $0.deviceAddress, deviceIndex: device.DeviceIndex, deviceName: device.DeviceName)
     }
 
     let toDo = cachedCommands[pivot...]

@@ -22,7 +22,7 @@ HapticHelper does not provide haptic feedback against arbitrary MUDs, although c
 
 ## HapticHelper's Interface
 
-In the current version, HapticHelper supports the following commands, all issued through the standard input. All commands are case sensitive. All commands but `STOP` take a device identifier; this is the device index as reported by Intiface™, and depending on the use case it may be required to set it in the Intiface™ Central configuration file.
+In the current version, HapticHelper supports the following commands, all issued through the standard input. All commands are case sensitive. All commands but `STOP` take a device identifier; by default, this is the device index as reported by Intiface™, and depending on the use case it may be required to set it in the Intiface™ Central configuration file. See also [Configuring HapticHelper](#configuring-haptichelper) below for more details on the device index.
 
 ```sh
 # immediately stop all devices
@@ -50,14 +50,14 @@ HapticHelper does not generally issue output on successful command execution; it
 STOP
 !! Stopping all devices.
 
-CONNECT xyz
+CONNECT unconfigured-device-name
 !! Invalid arguments, expected device index
 
-!! Device 4321 disconnected.
+!! Device `Device Name' disconnected.
 
 CONNECT 4321
 ?? Device not connected, scanning
-?? Connected to device 4321, issuing cached commands
+?? Connected to device `Device Name', issuing cached commands
 ```
 
 ## Installing HapticHelper
@@ -102,6 +102,46 @@ Any client that can run an external program in a session can be used for this pu
 
 **With all of this set up, you should now be connected through from MUD to buttplug.**
 
+## Configuring HapticHelper
+
+HapticHelper, when starting up, reads the file `~/.config/haptics.conf` for its alias settings. For security and privacy reasons aliases cannot be set during operation, and only the configuration file in the home directory is read; no other files are searched for, accessed, or read during startup.
+
+The configuration file consists of comments (lines beginning with `#`), blank lines, and alias declarations; an example configuration file can be found in `Resources/haptics.conf.example`, containing a very simple configuration suitable for most users.
+
+Each alias line consists of a command name, a source rule, and a destination rule.
+
+The command name is always `alias`. The source rule is either the wildcard rule (`*`) matching any device index, a numerical index, or an object identifier; the object identifier consists of an underscore or a lowercase character a--z, followed by any number of underscores, dashes and lowercase characters. The destination rule is the index rule (`@1`) matching the first available device, a numerical index matching a device index as reported by Intiface™ software, or a device name as reported by Intiface™ software. A device name, unlike an object identifier can contain spaces (and arbitrary unicode characters), although it cannot end with whitespace.
+
+Alias rules are read from top to bottom, and the first matching rule is immediately executed. This means that a file can *effectively* only contain one wildcard alias, as any action will match that rule, and that the wildcard rule has to be the final rule in the config file.
+
+For most users, the provided sample configuration file is likely to cover their use case:
+
+```
+# the example rule
+alias * @1
+```
+
+This example configuration is a wildcard to index rule, routing all commands to the first available device. When using multiple devices, however, this will be inadequate, and the index rule will not actuate all devices. In that case, a config file might look something like this.
+
+```
+# advanced example, with specific game objects being routed to specific devices
+alias plug Lovense Hush
+alias egg Lovense Lush
+```
+
+Note that device names here are those reported by Intiface™ software, and the exact format of the names may differ based on your software version and specific devices. Note also that the index rule is not a generic mechanism; there's no `@2`, `@3` and so on. Which device is considered the "first" device might also vary over time, if multiple devices are in play and connections are not stable. Note finally that without the wildcard rule, any numerical indices will be passed through as is. With the example file above, lines with `--` represent action descriptions, not output;
+
+```
+PULSE plug LOW
+-- Device `Lovense Hush' actuated
+
+PULSE egg LOW
+-- Device `Lovense Lush' actuated
+
+PULSE 0 LOW
+-- Device with device index 0 actuated
+```
+
 ## Support
 
 This software is fully offered as-is, but support may be available in the NeonMOO Discord server (as of time of writing Discord is teetering on the edge of viability, but this document will be updated to reflect other avenues of support). GitHub issues may also be fruitful.
@@ -114,4 +154,4 @@ The currently most useable setup for the program is connecting to MUDs via tinti
 
 ## Copying
 
-The code for HapticHelper is Copyright © 2026 Lexie T, and is licensed under the GPL v3.0 or later (see `LICENSE`). `Sources/HapticHelper/WebSocketsClient.swift` is adapted from and substantially quotes example files from the [Swift-NIO](https://github.com/apple/swift-nio) project, and added portions are licensed under the Apache License v2.0. Scripts (such as `Resources/haptics.tt++`), example input/output, and other similar content is released into the Public Domain, or licensed under Creative Commons 0 (CC0) where required by law. This file (excluding the aforementioned) is Copyright © 2026 Lexie T, all rights reserved. Intiface™ is a registered trademark of [Nonpolynomial](https://nonpolynomial.com).
+The code for HapticHelper is Copyright © 2026 Lexie T, and is licensed under the GPL v3.0 or later (see `LICENSE`). `Sources/HapticHelper/WebSocketsClient.swift` is adapted from and substantially quotes example files from the [SwiftNIO](https://github.com/apple/swift-nio) project, and added portions are licensed under the Apache License v2.0. Scripts (such as `Resources/haptics.tt++`), example input/output, and other similar content is released into the Public Domain, or licensed under Creative Commons 0 (CC0) where required by law. This file (excluding the aforementioned) is Copyright © 2026 Lexie T, all rights reserved. Intiface™ is a registered trademark of [Nonpolynomial](https://nonpolynomial.com).

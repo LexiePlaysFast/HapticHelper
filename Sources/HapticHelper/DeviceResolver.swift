@@ -38,7 +38,7 @@ class DeviceResolver {
     }
 
     init?(_ string: any StringProtocol) {
-      let elements = string.split(separator: " ", maxSplits: 2)
+      let elements = string.split(separator: " ", maxSplits: 1)
 
       guard
         elements.count == 2

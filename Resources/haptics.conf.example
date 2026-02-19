@@ -1,0 +1,5 @@
+# HapticsHelper example config file
+# Copyright © 2026 Lexie T — Public Domain, or CC0 where required by law
+
+# route all devices to first connected device
+alias * @1
